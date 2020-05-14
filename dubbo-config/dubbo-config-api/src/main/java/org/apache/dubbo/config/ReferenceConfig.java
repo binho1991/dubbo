@@ -398,7 +398,18 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
             checkInterfaceAndMethods(interfaceClass, getMethods());
         }
 
-        //init serivceMetadata
+        initServiceMetadata();
+
+        ServiceRepository repository = ApplicationModel.getServiceRepository();
+        ServiceDescriptor serviceDescriptor = repository.registerService(interfaceClass);
+        repository.registerConsumer(serviceMetadata.getServiceKey(),serviceDescriptor,this,null,serviceMetadata);
+
+        resolveFile();
+        ConfigValidationUtils.validateReferenceConfig(this);
+        postProcessConfig();
+    }
+    
+    public void initServiceMetadata() {
         serviceMetadata.setVersion(getVersion());
         serviceMetadata.setGroup(getGroup());
         serviceMetadata.setDefaultGroup(getGroup());
@@ -406,19 +417,6 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
         serviceMetadata.setServiceInterfaceName(interfaceName);
         // TODO, uncomment this line once service key is unified
         serviceMetadata.setServiceKey(URL.buildKey(interfaceName, group, version));
-
-        ServiceRepository repository = ApplicationModel.getServiceRepository();
-        ServiceDescriptor serviceDescriptor = repository.registerService(interfaceClass);
-        repository.registerConsumer(
-                serviceMetadata.getServiceKey(),
-                serviceDescriptor,
-                this,
-                null,
-                serviceMetadata);
-
-        resolveFile();
-        ConfigValidationUtils.validateReferenceConfig(this);
-        postProcessConfig();
     }
 
 
