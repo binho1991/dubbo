@@ -280,59 +280,15 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
         } else {
             urls.clear();
             if (url != null && url.length() > 0) { // user specified URL, could be peer-to-peer address, or register center's address.
-                String[] us = SEMICOLON_SPLIT_PATTERN.split(url);
-                if (us != null && us.length > 0) {
-                    for (String u : us) {
-                        URL url = URL.valueOf(u);
-                        if (StringUtils.isEmpty(url.getPath())) {
-                            url = url.setPath(interfaceName);
-                        }
-                        if (UrlUtils.isRegistry(url)) {
-                            urls.add(url.addParameterAndEncoded(REFER_KEY, StringUtils.toQueryString(map)));
-                        } else {
-                            urls.add(ClusterUtils.mergeUrl(url, map));
-                        }
-                    }
-                }
+            	fillUrlsFromUser(map);
             } else { // assemble URL from register center's configuration
-                // if protocols not injvm checkRegistry
-                if (!LOCAL_PROTOCOL.equalsIgnoreCase(getProtocol())) {
-                    checkRegistry();
-                    List<URL> us = ConfigValidationUtils.loadRegistries(this, false);
-                    if (CollectionUtils.isNotEmpty(us)) {
-                        for (URL u : us) {
-                            URL monitorUrl = ConfigValidationUtils.loadMonitor(this, u);
-                            if (monitorUrl != null) {
-                                map.put(MONITOR_KEY, URL.encode(monitorUrl.toFullString()));
-                            }
-                            urls.add(u.addParameterAndEncoded(REFER_KEY, StringUtils.toQueryString(map)));
-                        }
-                    }
-                    if (urls.isEmpty()) {
-                        throw new IllegalStateException("No such any registry to reference " + interfaceName + " on the consumer " + NetUtils.getLocalHost() + " use dubbo version " + Version.getVersion() + ", please config <dubbo:registry address=\"...\" /> to your spring config.");
-                    }
-                }
+            	fillUrlsFromRegister(map);
             }
 
             if (urls.size() == 1) {
                 invoker = REF_PROTOCOL.refer(interfaceClass, urls.get(0));
             } else {
-                List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
-                URL registryURL = null;
-                for (URL url : urls) {
-                    invokers.add(REF_PROTOCOL.refer(interfaceClass, url));
-                    if (UrlUtils.isRegistry(url)) {
-                        registryURL = url; // use last registry url
-                    }
-                }
-                if (registryURL != null) { // registry url is available
-                    // for multi-subscription scenario, use 'zone-aware' policy by default
-                    URL u = registryURL.addParameterIfAbsent(CLUSTER_KEY, ZoneAwareCluster.NAME);
-                    // The invoker wrap relation would be like: ZoneAwareClusterInvoker(StaticDirectory) -> FailoverClusterInvoker(RegistryDirectory, routing happens here) -> Invoker
-                    invoker = CLUSTER.join(new StaticDirectory(u, invokers));
-                } else { // not a registry url, must be direct invoke.
-                    invoker = CLUSTER.join(new StaticDirectory(invokers));
-                }
+            	mergeDirectoryInvokers();
             }
         }
 
@@ -364,6 +320,62 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
         }
         // create service proxy
         return (T) PROXY_FACTORY.getProxy(invoker, ProtocolUtils.isGeneric(generic));
+    }
+    
+    private void fillUrlsFromUser(Map<String, String> map) {
+        String[] us = SEMICOLON_SPLIT_PATTERN.split(url);
+        if (us != null && us.length > 0) {
+            for (String u : us) {
+                URL url = URL.valueOf(u);
+                if (StringUtils.isEmpty(url.getPath())) {
+                    url = url.setPath(interfaceName);
+                }
+                if (UrlUtils.isRegistry(url)) {
+                    urls.add(url.addParameterAndEncoded(REFER_KEY, StringUtils.toQueryString(map)));
+                } else {
+                    urls.add(ClusterUtils.mergeUrl(url, map));
+                }
+            }
+        }
+    }
+    
+    private void fillUrlsFromRegister(Map<String, String> map) {
+        // if protocols not injvm checkRegistry
+        if (!LOCAL_PROTOCOL.equalsIgnoreCase(getProtocol())) {
+            checkRegistry();
+            List<URL> us = ConfigValidationUtils.loadRegistries(this, false);
+            if (CollectionUtils.isNotEmpty(us)) {
+                for (URL u : us) {
+                    URL monitorUrl = ConfigValidationUtils.loadMonitor(this, u);
+                    if (monitorUrl != null) {
+                        map.put(MONITOR_KEY, URL.encode(monitorUrl.toFullString()));
+                    }
+                    urls.add(u.addParameterAndEncoded(REFER_KEY, StringUtils.toQueryString(map)));
+                }
+            }
+            if (urls.isEmpty()) {
+                throw new IllegalStateException("No such any registry to reference " + interfaceName + " on the consumer " + NetUtils.getLocalHost() + " use dubbo version " + Version.getVersion() + ", please config <dubbo:registry address=\"...\" /> to your spring config.");
+            }
+        }
+    }
+    
+    private void mergeDirectoryInvokers() {
+        List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
+        URL registryURL = null;
+        for (URL url : urls) {
+            invokers.add(REF_PROTOCOL.refer(interfaceClass, url));
+            if (UrlUtils.isRegistry(url)) {
+                registryURL = url; // use last registry url
+            }
+        }
+        if (registryURL != null) { // registry url is available
+            // for multi-subscription scenario, use 'zone-aware' policy by default
+            URL u = registryURL.addParameterIfAbsent(CLUSTER_KEY, ZoneAwareCluster.NAME);
+            // The invoker wrap relation would be like: ZoneAwareClusterInvoker(StaticDirectory) -> FailoverClusterInvoker(RegistryDirectory, routing happens here) -> Invoker
+            invoker = CLUSTER.join(new StaticDirectory(u, invokers));
+        } else { // not a registry url, must be direct invoke.
+            invoker = CLUSTER.join(new StaticDirectory(invokers));
+        }
     }
 
     /**
