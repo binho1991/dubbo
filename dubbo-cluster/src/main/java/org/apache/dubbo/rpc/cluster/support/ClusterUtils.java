@@ -57,26 +57,7 @@ public class ClusterUtils {
             map.putAll(remoteMap);
 
             // Remove configurations from provider, some items should be affected by provider.
-            map.remove(THREAD_NAME_KEY);
-            map.remove(DEFAULT_KEY_PREFIX + THREAD_NAME_KEY);
-
-            map.remove(THREADPOOL_KEY);
-            map.remove(DEFAULT_KEY_PREFIX + THREADPOOL_KEY);
-
-            map.remove(CORE_THREADS_KEY);
-            map.remove(DEFAULT_KEY_PREFIX + CORE_THREADS_KEY);
-
-            map.remove(THREADS_KEY);
-            map.remove(DEFAULT_KEY_PREFIX + THREADS_KEY);
-
-            map.remove(QUEUES_KEY);
-            map.remove(DEFAULT_KEY_PREFIX + QUEUES_KEY);
-
-            map.remove(ALIVE_KEY);
-            map.remove(DEFAULT_KEY_PREFIX + ALIVE_KEY);
-
-            map.remove(Constants.TRANSPORTER_KEY);
-            map.remove(DEFAULT_KEY_PREFIX + Constants.TRANSPORTER_KEY);
+            removeConfigurationsFromProvider(map);
         }
 
         if (localMap != null && localMap.size() > 0) {
@@ -100,21 +81,44 @@ public class ClusterUtils {
             map.put(REMOTE_APPLICATION_KEY, remoteMap.get(APPLICATION_KEY));
 
             // Combine filters and listeners on Provider and Consumer
-            String remoteFilter = remoteMap.get(REFERENCE_FILTER_KEY);
-            String localFilter = copyOfLocalMap.get(REFERENCE_FILTER_KEY);
-            if (remoteFilter != null && remoteFilter.length() > 0
-                    && localFilter != null && localFilter.length() > 0) {
-                map.put(REFERENCE_FILTER_KEY, remoteFilter + "," + localFilter);
-            }
-            String remoteListener = remoteMap.get(INVOKER_LISTENER_KEY);
-            String localListener = copyOfLocalMap.get(INVOKER_LISTENER_KEY);
-            if (remoteListener != null && remoteListener.length() > 0
-                    && localListener != null && localListener.length() > 0) {
-                map.put(INVOKER_LISTENER_KEY, remoteListener + "," + localListener);
-            }
+            combineProviderAndConsumer(map, remoteMap, copyOfLocalMap, REFERENCE_FILTER_KEY);
+            combineProviderAndConsumer(map, remoteMap, copyOfLocalMap, INVOKER_LISTENER_KEY);
         }
 
         return remoteUrl.clearParameters().addParameters(map);
     }
+
+	private static void combineProviderAndConsumer(Map<String, String> map, Map<String, String> remoteMap,
+			Map<String, String> copyOfLocalMap, String filterOrListener) {
+		String remote = remoteMap.get(filterOrListener);
+		String local = copyOfLocalMap.get(filterOrListener);
+		if (remote != null && remote.length() > 0
+		        && local != null && local.length() > 0) {
+		    map.put(filterOrListener, remote + "," + local);
+		}
+	}
+
+	private static void removeConfigurationsFromProvider(Map<String, String> map) {
+		map.remove(THREAD_NAME_KEY);
+		map.remove(DEFAULT_KEY_PREFIX + THREAD_NAME_KEY);
+
+		map.remove(THREADPOOL_KEY);
+		map.remove(DEFAULT_KEY_PREFIX + THREADPOOL_KEY);
+
+		map.remove(CORE_THREADS_KEY);
+		map.remove(DEFAULT_KEY_PREFIX + CORE_THREADS_KEY);
+
+		map.remove(THREADS_KEY);
+		map.remove(DEFAULT_KEY_PREFIX + THREADS_KEY);
+
+		map.remove(QUEUES_KEY);
+		map.remove(DEFAULT_KEY_PREFIX + QUEUES_KEY);
+
+		map.remove(ALIVE_KEY);
+		map.remove(DEFAULT_KEY_PREFIX + ALIVE_KEY);
+
+		map.remove(Constants.TRANSPORTER_KEY);
+		map.remove(DEFAULT_KEY_PREFIX + Constants.TRANSPORTER_KEY);
+	}
 
 }
